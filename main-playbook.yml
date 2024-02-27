@@ -43,13 +43,14 @@
       win_shell: Get-Content -Path 'C:\Certs\splunk.{{domain_name}}.key'
       register: key_content
 
-    - name: Add cert, key, and CA cert content to linux hosts
+    - name: Add cert and key cert content to splunk and nginx hosts
       add_host:
         name: "{{ item }}"
-        groups: linux
         windows_crt: "{{ crt_content.stdout }}"
         windows_key: "{{ key_content.stdout }}"
-      loop: "{{ groups['linux'] }}"
+      loop:
+        - "{{ splunk_host }}"
+        - "{{ nginx_host }}"  
 
 - name: Splunk Installation and Configuration Tasks
   hosts: "{{ splunk_host }}"

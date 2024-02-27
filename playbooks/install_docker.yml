@@ -1,0 +1,37 @@
+- name: Check if Docker is installed and available
+  ansible.builtin.command: which docker
+  register: docker_check
+  ignore_errors: true
+
+- name: Install dnf-plugins-core
+  ansible.builtin.package:
+    name: dnf-plugins-core
+    state: present
+  when: ansible_pkg_mgr == 'dnf' and docker_check.rc != 0
+
+- name: Add Docker repository
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+  when: ansible_pkg_mgr == 'dnf' and docker_check.rc != 0
+
+- name: Install Docker packages
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  when: ansible_pkg_mgr == 'dnf' and docker_check.rc != 0
+
+- name: Run Docker install script
+  shell: curl -fsSL https://get.docker.com | sh
+  when: ansible_pkg_mgr != 'dnf' and docker_check.rc != 0
+
+- name: Enable and start Docker service
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes

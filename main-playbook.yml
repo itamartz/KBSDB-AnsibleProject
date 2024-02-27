@@ -1,0 +1,68 @@
+- name: AD Installation and Configuration Tasks
+  hosts: "{{ windows_host }}"
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/install_ad.yml
+
+- name: ADCA Installation and Configuration Tasks
+  hosts: "{{ windows_host }}"
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/install_ca.yml
+
+- name: Generate SSL Installation and Configuration Tasks
+  hosts: "{{ windows_host }}"
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/generate_ssl.yml
+
+- name: Docker Installation and Configuration Tasks
+  hosts: "{{ splunk_host }}:{{ nginx_host }}"
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/install_docker.yml
+
+- name: Get Splunk Certificates from Windows and store it in a variable
+  hosts: "{{ windows_host }}"
+  gather_facts: no
+  vars_files:
+     - vars.yml
+  tasks:
+    - name: Get certificate content
+      win_shell: Get-Content -Path 'C:\Certs\splunk.{{domain_name}}.crt'
+      register: crt_content
+
+    - name: Get key content
+      win_shell: Get-Content -Path 'C:\Certs\splunk.{{domain_name}}.key'
+      register: key_content
+
+    - name: Add cert, key, and CA cert content to linux hosts
+      add_host:
+        name: "{{ item }}"
+        groups: linux
+        windows_crt: "{{ crt_content.stdout }}"
+        windows_key: "{{ key_content.stdout }}"
+      loop: "{{ groups['linux'] }}"
+
+- name: Splunk Installation and Configuration Tasks
+  hosts: "{{ splunk_host }}"
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/install_splunk.yml
+
+- name: Nginx Installation and Configuration Tasks
+  hosts: "{{ nginx_host }}"
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - include_tasks: playbooks/install_nginx.yml

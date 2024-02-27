@@ -1,0 +1,66 @@
+- name: Ensure directory exists for Docker Compose file
+  ansible.builtin.file:
+    path: ~/splunk
+    state: directory
+
+- name: Create certificate file on Linux server
+  ansible.builtin.copy:
+    content: "{{ windows_crt }}"
+    dest: "~/splunk/splunk.{{domain_name}}.crt"
+
+- name: Create key file on Linux server
+  ansible.builtin.copy:
+    content: "{{ windows_key }}"
+    dest: "~/splunk/splunk.{{domain_name}}.key"
+
+- name: Generate Docker Compose file
+  ansible.builtin.copy:
+    content: |
+      version: '3'
+      services:
+        splunk:
+          image: splunk/splunk:latest
+          container_name: splunk
+          volumes:
+            - /etc/localtime:/etc/localtime:ro
+            - ~/splunk/splunk.{{domain_name}}.combined.pem:/home/ssl.pem
+            - ~/splunk/splunk.{{domain_name}}.crt:/home/cert.pem
+            - ~/splunk/splunk.{{domain_name}}.key:/home/key.pem
+            - ~/splunk/splunk-data/var:/opt/splunk/var
+            - ~/splunk/splunk-data/etc:/opt/splunk/etc
+            - ~/splunk/web.conf:/opt/splunk/etc/system/local/web.conf
+
+          ports:
+            - "443:8000"
+            - "8088:8088"
+          environment:
+            SPLUNK_START_ARGS: --accept-license --answer-yes
+            SPLUNK_PASSWORD: 322fs@KKD0*j2m
+            SPLUNK_LICENSE_URI: Free
+            SPLUNK_HEC_TOKEN: e357e7fd-9db5-4cf5-a574-7a3c64fc8d39
+          restart: always
+        
+    dest: ~/splunk/splunk_docker-compose.yml
+  
+- name: Create web.conf
+  ansible.builtin.copy:
+    dest: "~/splunk/web.conf"
+    content: |
+      [settings]
+      mgmtHostPort = 0.0.0.0:8089
+      enableSplunkWebSSL = true
+      serverCert = /home/cert.pem
+      privKeyPath = /home/key.pem
+
+- name: Start Splunk using Docker Compose
+  ansible.builtin.command:
+    cmd: docker compose -f ~/splunk/splunk_docker-compose.yml up --force-recreate -d --remove-orphans
+  register: docker_compose_up_output
+
+- name: Wait for Splunk container to be healthy
+  ansible.builtin.command:
+    cmd: docker inspect --format="{{ '{{' }}.State.Health.Status{{ '}}' }}" splunk
+  register: docker_inspect_output
+  until: docker_inspect_output.stdout == 'healthy'
+  retries: 99
+  delay: 30

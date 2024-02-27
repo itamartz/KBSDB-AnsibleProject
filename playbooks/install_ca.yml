@@ -1,0 +1,40 @@
+- name: Install Certificate Services
+  win_feature:
+    name: ADCS-Cert-Authority
+    include_management_tools: true
+    state: present
+
+- name: Configure the Certification Authority
+  win_shell: |
+    Install-AdcsCertificationAuthority -CAType EnterpriseRootCA -CACommonName "{{domain_name}}" -KeyLength 2048 -HashAlgorithm SHA256 -ValidityPeriod Years -ValidityPeriodUnits 30 -Force
+  args:
+    creates: C:\Windows\System32\CertSrv\CertEnroll
+
+- name: Check if OpenSSL is installed
+  win_command: openssl version
+  register: openssl_installed
+  ignore_errors: yes
+
+- name: Download OpenSSL installer #same openssl that microsoft uses for winget
+  win_get_url:
+    url: 'https://download.firedaemon.com/FireDaemon-OpenSSL/FireDaemon-OpenSSL-x64-3.2.1.exe'
+    dest: 'C:\FireDaemon-OpenSSL-x64-3.2.1.exe'
+  when: openssl_installed is failed
+
+- name: Install OpenSSL
+  win_command: 'C:\FireDaemon-OpenSSL-x64-3.2.1.exe /exenoui /exelog fdopenssl3.log /qn /norestart REBOOT=ReallySuppress APPDIR="C:\Program Files\FireDaemon OpenSSL 3" ADJUSTSYSTEMPATHENV=yes'
+  args:
+    creates: 'C:\Program Files\FireDaemon OpenSSL 3'
+  when: openssl_installed is failed
+
+- name: Delete the OpenSSL installer
+  win_file:
+    path: 'C:\FireDaemon-OpenSSL-x64-3.2.1.exe'
+    state: absent
+  when: openssl_installed is failed
+
+- name: Add record to hosts file
+  win_lineinfile:
+    path: C:\Windows\System32\drivers\etc\hosts
+    line: '{{splunk_ip}}    splunk.{{domain_name}}'
+    state: present  

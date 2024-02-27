@@ -1,0 +1,38 @@
+- name: Ensure C:\Certs directory exists
+  win_file:
+    path: C:\Certs
+    state: directory
+
+- name: Create OpenSSL Config with SAN
+  copy:
+    dest: C:\Certs\openssl_san.cnf
+    content: |
+      [req]
+      distinguished_name = req_distinguished_name
+      req_extensions = v3_req
+      prompt = no
+
+      [req_distinguished_name]
+      CN = splunk.{{domain_name}}
+
+      [v3_req]
+      keyUsage = keyEncipherment, dataEncipherment
+      extendedKeyUsage = serverAuth
+      subjectAltName = @alt_names
+
+      [alt_names]
+      DNS.1 = splunk.{{domain_name}}    
+
+- name: Generate private key and CSR with SAN
+  win_shell: |
+    openssl genrsa -out splunk.{{domain_name}}.key 2048
+    openssl req -new -key splunk.{{domain_name}}.key -out splunk.{{domain_name}}.csr -config C:\Certs\openssl_san.cnf
+  args:
+    chdir: C:\Certs
+    creates: C:\Certs\splunk.{{domain_name}}.csr
+
+- name: Submit CSR to Windows CA and get the signed certificate
+  win_shell: |
+    certreq -submit -config "localhost\{{domain_name}}" -attrib "CertificateTemplate:WebServer" C:\Certs\splunk.{{domain_name}}.csr C:\Certs\splunk.{{domain_name}}.crt
+  args:
+    creates: C:\Certs\splunk.{{domain_name}}.crt

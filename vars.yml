@@ -1,0 +1,5 @@
+windows_host: "windows"
+domain_name: "yershov.local"
+nginx_host: "nginx"
+splunk_host: "splunk"
+splunk_ip: "192.168.177.101"

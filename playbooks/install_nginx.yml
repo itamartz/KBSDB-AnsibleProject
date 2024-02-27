@@ -1,0 +1,32 @@
+- name: Ensure directory exists for Docker Compose file
+  ansible.builtin.file:
+    path: ~/nginx
+    state: directory
+
+- name: Generate Docker Compose file
+  ansible.builtin.copy:
+    content: |
+      version: '3'
+      services:
+        nginx:
+          image: nginx:alpine
+          container_name: nginx
+          volumes:
+            - /etc/localtime:/etc/localtime:ro
+          ports:
+            - "80:80"
+          logging:
+            driver: splunk
+            options:
+              splunk-token: "e357e7fd-9db5-4cf5-a574-7a3c64fc8d39"
+              splunk-url: "https://{{splunk_ip}}:8088"
+              splunk-insecureskipverify: "true"
+              tag: "{{ '{{' }}.ImageName{{ '}}' }}/{{ '{{' }}.Name{{ '}}' }}/{{ '{{' }}.ID{{ '}}' }}"
+          restart: always
+        
+    dest: ~/nginx/nginx_docker-compose.yml
+  
+- name: Start nginx using Docker Compose
+  ansible.builtin.command:
+    cmd: docker compose -f ~/nginx/nginx_docker-compose.yml up --force-recreate -d --remove-orphans
+
